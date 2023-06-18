@@ -24,10 +24,22 @@ The stock screener analyzes a list of stock symbols and filters them based on pr
 
 The `config.yaml` file contains various settings and parameters for the stock screener. You can modify these values according to your requirements. Here are the key configuration options:
 
-- `threshold_positive`: The threshold percentage for identifying stocks with positive returns.
-- `threshold_negative`: The threshold percentage for identifying stocks with negative returns.
-- `target_time`: The target time to start scanning for potential trades.
-- `starting_capital`: The initial amount of capital available for trading.
+- `threshold_positive`: The threshold percentage for identifying stocks with positive returns. Currently set to: 4.7
+- `threshold_negative`: The threshold percentage for identifying stocks with negative returns. Currently set to: -4.7
+- `target_time`: The target time to start scanning for potential trades. Currently set to: '09:14:00'
+- `order_execution_time`: The time at which the orders should be executed. Currently set to: '09:15:00'
+- `share_price_min_threshold`: The minimum price for share to considered. Currently set to: 50
+- `share_price_max_threshold`: The maximum price for share to considered. Currently set to: 3000
+- `stop_loss`: The stop loss percentage for trades. Currently set to: 0.01
+- `target1`: The first target percentage for trades. Currently set to: 0.005
+- `target2`: The second target percentage for trades. Currently set to: 0.075
+- `target3`: The third target percentage for trades. Currently set to: 0.01
+- `capital`: The initial amount of capital available for trading. Currently set to: 1000
+- `buffer_entry`: The buffer percentage for entry prices. Currently set to: 0.001
+- `buffer_trigger`: The buffer percentage for trigger prices. Currently set to: 0.05
+
+You can update these values in the `config.yaml` file based on your requirements.
+
 
 ## Results
 

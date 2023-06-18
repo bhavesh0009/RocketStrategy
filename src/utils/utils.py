@@ -105,6 +105,7 @@ class Utils:
 
     @staticmethod
     def sleep_until_time(target_time):
+        logging.info(f"Sleeping till {target_time}.")
         target_time = datetime.strptime(target_time, '%H:%M:%S').time()
         current_time = datetime.now(pytz.timezone('Asia/Kolkata')).time()
         time_diff = datetime.combine(date.today(), target_time) - datetime.combine(date.today(), current_time)
