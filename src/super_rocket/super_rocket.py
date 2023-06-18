@@ -7,60 +7,55 @@ import yaml
 from utils.utils import Utils
 import logging
 
-class RocketScreener:
+class SuperRocket:
     def __init__(self):
-        self.capital = 100000
-        self.rocket_stocks = []
+        self.rocket_stocks = {}
         self.broker_name = Controller.brokerName
         self.obj = Controller.brokerLogin
 
     def screen_stocks(self):
         self.get_start_scan_time()
-        Utils.sleep_until_time(self.target_time)
         self.read_screened_stocks()
+        Utils.sleep_until_time(self.target_time)
         self.process_stocks()
         self.export_rocket_stocks()
     
     def get_start_scan_time(self):
-        root_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        yaml_path = os.path.join(root_dir, 'config', 'config.yaml')
-        with open(yaml_path, 'r') as yaml_file:
-            config = yaml.safe_load(yaml_file)
+        config = Utils.get_config()
         self.target_time = config['target_time']
 
     def read_screened_stocks(self):
-        filename = os.path.join("data", "screened_stocks.csv")
+        #today = datetime.today().strftime("%Y_%m_%d")
+        today = '2023_06_19' # Hardcoding to test on weekend.
+        filename = os.path.join("data", f"screened_stocks_{today}.csv")
         df = pd.read_csv(filename)
         self.screened_stocks = df.to_dict('records')
 
     def process_stocks(self):
         symbol_token_mapping = pd.read_csv('data/symbol_token_mapping.csv').set_index('symbol')['token'].to_dict()
-        # Get the current time
-        current_time = datetime.now().time()
         # Check if the current time is after 9:14:00 am
+        current_time = datetime.now().time()
         target_time_obj = datetime.strptime(self.target_time, "%H:%M:%S").time()
         if current_time >= target_time_obj:
             for stock in self.screened_stocks:
                 symbol = stock['symbol']
                 flag = int(stock['flag'])
                 percent_return = float(stock['percent_return'])
-
-                token = symbol_token_mapping.get(f"{symbol}-EQ")
-                ltp = self.obj.ltpData("NSE", f"{symbol}-EQ",token)
-                ltp = ltp['data']['open']
-                # Get the previous day's high and low (assuming you have a method to retrieve it)
+                token = str(symbol_token_mapping.get(symbol))
+                resp = self.obj.scriptinfo("NSE", token)
+                ltp = float(resp['o'])
                 previous_day_high = stock['prev_high']
                 previous_day_low = stock['prev_low']
-
-                # Check the flag and compare LTP with the previous day's high or low
-                
                 if flag == 1 and ltp > previous_day_high:
-                    self.rocket_stocks.append(symbol)
+                    self.rocket_stocks[symbol] = "sell"
                 elif flag == -1 and ltp < previous_day_low:
-                    self.rocket_stocks.append(symbol)
+                    self.rocket_stocks[symbol] = "buy"
 
     def export_rocket_stocks(self):
         current_date = datetime.now().strftime("%Y%m%d")
         filename = os.path.join("data", f"rocket_shortlisted_{current_date}.csv")
-        df = pd.DataFrame({"symbol": self.rocket_stocks})
+        df = pd.DataFrame.from_dict(self.rocket_stocks, orient='index', columns=['Signal'])
+        df.reset_index(inplace=True)
+        df.columns = ['Stock', 'Signal']
+        # df = pd.DataFrame({"symbol": self.rocket_stocks})
         df.to_csv(filename, index=False)

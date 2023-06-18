@@ -1,3 +1,13 @@
 threshold_positive: 4.7
 threshold_negative: -4.7
 target_time: '09:14:00'
+order_execution_time: '09:15:00'
+share_price_min_threshold: 50
+share_price_max_threshold: 3000
+stop_loss: 0.01
+target1: 0.005
+target2: 0.075
+target3: 0.01
+capital: 1000
+buffer_entry: 0.001
+buffer_trigger: 0.05

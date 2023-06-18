@@ -5,6 +5,8 @@ import time
 import calendar
 from datetime import datetime, timedelta, date
 import pytz
+import os
+import yaml
 
 # from config.Config import getHolidays
 # from models.Direction import Direction
@@ -25,6 +27,18 @@ class Utils:
         x = round(price, 2) * 20
         y = math.ceil(x)
         return y / 20
+
+    @staticmethod
+    def get_config():
+        # Read the threshold values from the YAML file
+        # root_dir = os.path.dirname(os.path.dirname(__file__))
+        # yaml_path = os.path.join(root_dir, 'config', 'config.yaml')
+        # with open(yaml_path, 'r') as yaml_file:
+        #     config = yaml.safe_load(yaml_file)        
+        config_file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../config/config.yaml"))
+        with open(config_file_path, 'r') as yaml_file:
+            config = yaml.safe_load(yaml_file)        
+            return config
 
     @staticmethod
     def isMarketOpen():
@@ -102,19 +116,26 @@ class Utils:
         #logging.info("Target time reached. Continue with the rest of the code.")
 
 
-    # @staticmethod
-    # def isHoliday(datetimeObj):
-    #     dayOfWeek = calendar.day_name[datetimeObj.weekday()]
-    #     if dayOfWeek == 'Saturday' or dayOfWeek == 'Sunday':
-    #         return True
+    @staticmethod
+    def isHoliday(datetimeObj):
+        dayOfWeek = calendar.day_name[datetimeObj.weekday()]
+        if dayOfWeek == 'Saturday' or dayOfWeek == 'Sunday':
+            return True
 
-    #     dateStr = Utils.convertToDateStr(datetimeObj)
-    #     holidays = getHolidays()
-    #     if (dateStr in holidays):
-    #         return True
-    #     else:
-    #         return False
+        dateStr = Utils.convertToDateStr(datetimeObj)
+        holidays = Utils.getHolidays()
+        if (dateStr in holidays):
+            return True
+        else:
+            return False
 
-    # @staticmethod
-    # def isTodayHoliday():
-    #     return Utils.isHoliday(datetime.now())            
+    @staticmethod
+    def getHolidays():
+        holidays_file = os.path.join("config", "holidays.csv")
+        holidays_df = pd.read_csv(holidays_file)
+        holidays = holidays_df["date"].tolist()
+        return holidays
+
+    @staticmethod
+    def isTodayHoliday():
+        return Utils.isHoliday(datetime.now())            
