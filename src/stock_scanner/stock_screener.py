@@ -19,11 +19,10 @@ class StockScreener:
         self.broker_name = Controller.brokerName
     
     def getEpoch(self, datetimeObj = None):
-        # This method converts given datetimeObj to epoch seconds
         if datetimeObj == None:
             datetimeObj = datetime.now()
         epochSeconds = datetime.timestamp(datetimeObj)
-        return int(epochSeconds) # converting double to long    
+        return int(epochSeconds)
 
     def get_symbol_to_token_mapping(self):
         logging.info("Mapping symbol to token..")
@@ -57,6 +56,9 @@ class StockScreener:
         logging.info("Symbol to token mapping is refreshed.")
 
     def get_next_trading_day(self):
+        current_time = datetime.now().time()
+        if current_time.hour < 15 or (current_time.hour == 15 and current_time.minute < 35):
+            return date.today().strftime('%Y_%m_%d')
         today = date.today()
         tomorrow = today + timedelta(days=1)
         holidays_df = pd.read_csv("config/holidays.csv")
@@ -80,8 +82,8 @@ class StockScreener:
             logging.info("Getting stock data...")
             for symbol in  tqdm(self.stock_symbols, desc="Processing", unit="symbol"):
                 stock_data = self.fetch_stock_data(symbol)
-                if stock_data is None:
-                    logging.warning(f"No data found for {symbol}.")
+                # if stock_data.shape[0] == 0:
+                #     logging.warning(f"No data found for {symbol}.")
                 percent_return = self.calculate_percent_return(stock_data)
                 flag = self.check_flag(percent_return)
                 prev_close = stock_data['Close'].iloc[-1]
@@ -122,6 +124,7 @@ class StockScreener:
         df[~(df.flag==0)].to_csv(os.path.join("data", f"screened_stocks_{next_trading_day}.csv"), index=False)
 
     def fetch_stock_data(self, symbol):
+        logging.debug("Running fuction fetch_stock_data.")
         symbol_eq = symbol #+ "-EQ"  # Add "-EQ" to the symbol
         token = self.symbol_token_mapping.loc[self.symbol_token_mapping["symbol"] == symbol_eq, "token"].values[0]
         current_time = datetime.now().time()
@@ -136,17 +139,36 @@ class StockScreener:
         exchange = "NSE"
         start_datetime = self.getEpoch(start_datetime)
         end_datetime = self.getEpoch(end_datetime)
-        try:
-            quote_history = self.obj.historical(exchange, str(token),start_datetime ,end_datetime)
-        except:
-            logging.warning(f"Got an error while fetching data for {symbol}")
-            time.sleep(2)
+        # quote_history = self.obj.historical(exchange, str(token),start_datetime ,end_datetime)
+        quote_history = self.get_history(exchange, str(token), start_datetime , end_datetime)
+        logging.debug(f"Total records recieved : {len(quote_history)}")
         stock_data = self.process_history_data(quote_history)
         return stock_data
 
+    def get_history(self, exchange, token, start_datetime, end_datetime):
+        logging.debug("Running fuction get_history.")
+        max_retries = 3
+        retry_delay = 5
+        for retry in range(max_retries):
+            try:
+                quote_history = self.obj.historical(exchange, token, start_datetime, end_datetime)
+                logging.debug(f"Total records recieved : {len(quote_history)}")
+                if len(quote_history) == 0:
+                    logging.warning(f"No data found for {token}")
+                    time.sleep(retry_delay)
+                else:
+                    break  
+            except Exception as e:
+                logging.warning(f"Error occurred while fetching data for {token}: {str(e)}")
+                time.sleep(retry_delay)
+        return quote_history
+
     def process_history_data(self, quote_history):
+        logging.debug("Running fuction process_history_data.")
+        logging.debug(f"Total records recieved : {len(quote_history)}")
         columns=['time', 'into', 'inth', 'intl', 'intc', 'intv']
         df = pd.DataFrame(quote_history, columns=columns)
+        logging.debug(f"Shape of dataframe is {df.shape}")
         df['time'] = pd.to_datetime(df['time'], format='%d-%m-%Y %H:%M:%S')
         df = df.rename(columns={'time': 'Date', 'into': 'Open', 'inth': 'High', 'intl': 'Low', 'intc': 'Close', 'intv': 'Volume'})
         unique_dates = df['Date'].dt.date.unique()

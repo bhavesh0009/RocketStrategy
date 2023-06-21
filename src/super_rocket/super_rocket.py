@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from datetime import datetime, time
+from datetime import datetime, timedelta,  time as dt_time
 import time
 from controller.controller import Controller
 import yaml
@@ -25,9 +25,15 @@ class SuperRocket:
         self.target_time = config['target_time']
 
     def read_screened_stocks(self):
-        #today = datetime.today().strftime("%Y_%m_%d")
-        today = '2023_06_19' # Hardcoding to test on weekend.
-        filename = os.path.join("data", f"screened_stocks_{today}.csv")
+        now = datetime.now()
+        # cutoff_time = datetime.combine(now.date(), dt_time(15, 30))
+        # logging.info(now)
+        # logging.info(cutoff_time)
+        # if now < cutoff_time:
+        #     date_str = (now - timedelta(days=1)).strftime("%Y_%m_%d")
+        # else:
+        date_str = now.strftime("%Y_%m_%d")        
+        filename = os.path.join("data", f"screened_stocks_{date_str}.csv")
         df = pd.read_csv(filename)
         self.screened_stocks = df.to_dict('records')
 
@@ -43,6 +49,7 @@ class SuperRocket:
                 percent_return = float(stock['percent_return'])
                 token = str(symbol_token_mapping.get(symbol))
                 resp = self.obj.scriptinfo("NSE", token)
+                logging.info(resp)
                 ltp = float(resp['o'])
                 previous_day_high = stock['prev_high']
                 previous_day_low = stock['prev_low']

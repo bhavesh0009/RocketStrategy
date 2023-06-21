@@ -1086,3 +1086,129 @@ class NorenApi:
         resDict = json.loads(res.text)        
 
         return resDict
+    def place_gtt_oco_mkt_order(
+        self,
+        tradingsymbol,
+        exchange,
+        alert_price_above_1,
+        alert_price_below_2,
+        buy_or_sell,  # 'B' or 'S'
+        product_type,  # 'I' Intraday, 'C' Delivery, 'M' Normal Margin for options
+        quantity,
+        remarks="PLACE_OCO_MKT",
+        ):
+        # prepare the uri
+        config = NorenApi.__service_config
+        url = f"{config['host']}{config['routes']['ocogtt']}"
+        reportmsg(url)
+
+        retention = "DAY"
+        validity = "GTT"
+        price_type = self.PRICE_TYPE_MARKET
+        price = 0.0
+
+        oivariable = [
+            {"d": str(alert_price_above_1), "var_name": "x"},
+            {"d": str(alert_price_below_2), "var_name": "y"},
+        ]
+
+        order_params = {}
+        order_params["tsym"] = tradingsymbol
+        order_params["exch"] = exchange
+        order_params["trantype"] = buy_or_sell
+        order_params["prctyp"] = price_type
+        order_params["prd"] = product_type
+        order_params["ret"] = retention
+        order_params["actid"] = self.__accountid
+        order_params["uid"] = self.__username
+        order_params["ordersource"] = "API"
+        order_params["qty"] = str(quantity)
+        order_params["prc"] = str(price)
+
+        # prepare the data
+        values = {}
+        values["uid"] = self.__username
+        values["ai_t"] = self.ALERT_TYPE_OCO
+        values["remarks"] = remarks
+        values["validity"] = validity
+        values["tsym"] = urllib.parse.quote_plus(tradingsymbol)
+        values["exch"] = exchange
+        values["oivariable"] = oivariable
+        values["place_order_params"] = order_params
+        values["place_order_params_leg2"] = order_params
+
+        payload = "jData=" + json.dumps(values) + f"&jKey={self.__susertoken}"
+        reportmsg(payload)
+
+        res = requests.post(url, data=payload)
+        reportmsg(res.text)
+
+        resDict = json.loads(res.text)
+        if resDict["stat"] != "OI created":
+            return None
+
+        return resDict["al_id"]
+
+    def modify_gtt_oco_mkt_order(
+        self,
+        tradingsymbol: str,
+        exchange: str,
+        alert_id: int,
+        alert_price_above_1: float,
+        alert_price_below_2: float,
+        buy_or_sell: str,  # 'B' or 'S'
+        product_type: str,  # 'I' Intraday, 'C' Delivery, 'M' Normal Margin for options
+        quantity: int,
+        remarks: str = "MODIFY_OCO_MKT",
+        ):
+        # prepare the uri
+        config = NorenApi.__service_config
+        url = f"{config['host']}{config['routes']['modifyoco']}"
+        reportmsg(url)
+
+        retention = "DAY"
+        validity = "GTT"
+        price = 0.0
+        price_type = self.PRICE_TYPE_MARKET
+
+        oivariable = [
+            {"d": str(alert_price_above_1), "var_name": "x"},
+            {"d": str(alert_price_below_2), "var_name": "y"},
+        ]
+
+        order_params = {"ordersource": "API"}
+        order_params["tsym"] = tradingsymbol
+        order_params["exch"] = exchange
+        order_params["trantype"] = buy_or_sell
+        order_params["prctyp"] = price_type
+        order_params["prd"] = product_type
+        order_params["qty"] = str(quantity)
+        order_params["uid"] = self.__username
+        order_params["actid"] = self.__accountid
+        order_params["ret"] = retention
+        order_params["prc"] = str(price)
+
+        # prepare the data
+        values = {"ordersource": "API"}
+        values["uid"] = self.__username
+        values["ai_t"] = self.ALERT_TYPE_OCO
+        values["remarks"] = remarks
+        values["validity"] = validity
+        values["tsym"] = urllib.parse.quote_plus(tradingsymbol)
+        values["exch"] = exchange
+        values["al_id"] = alert_id
+        values["oivariable"] = oivariable
+        values["place_order_params"] = order_params
+        values["place_order_params_leg2"] = order_params
+
+        payload = "jData=" + json.dumps(values) + f"&jKey={self.__susertoken}"
+        print(payload)
+
+        res = requests.post(url, data=payload)
+        print(res.text)
+
+        resDict = json.loads(res.text)
+        if resDict["stat"] != "OI replaced":
+            return None
+
+        return resDict["al_id"]
