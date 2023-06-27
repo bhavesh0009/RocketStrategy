@@ -17,13 +17,14 @@ if pmart.authenticate():
 token = pmart.instrument_symbol("NSE", "SBIN-EQ")
 resp = pmart.scriptinfo("NSE", token)
 print(resp)
+
+
 """
 pmart.finvasia.place_order(buy_or_sell='B', product_type='B', exchange='NSE',
                            tradingsymbol='INFY-EQ', quantity=2, discloseqty=1,
                            price_type='LMT', price=1500, trigger_price=None,
                            retention='DAY', remarks='my_order_001',
                            bookloss_price=1490, bookprofit_price=1510)
-"""
 pmart.order_place(side='B', product='B', exchange='NSE',
                   symbol='INFY-EQ', quantity=2, disclosed_quantity=1,
                   order_type='LIMIT', price=1500, trigger_price=None,
@@ -31,6 +32,7 @@ pmart.order_place(side='B', product='B', exchange='NSE',
                   bookloss_price=1490, bookprofit_price=1510)
 
 
+"""
 resp = pmart.orders
 pprint(resp)
 
