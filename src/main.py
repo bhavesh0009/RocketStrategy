@@ -23,10 +23,10 @@ target_time = config['target_time']
 share_price_min_threshold = config['share_price_min_threshold']
 share_price_max_threshold = config['share_price_max_threshold']
 
-# Commenting following code to run on weekend.
-if Utils.isTodayHoliday():
-    logging.info("Today is a weekend or holiday. Skipping the execution of the code.")
-    sys.exit()
+# # Commenting following code to run on weekend.
+# if Utils.isTodayHoliday():
+#     logging.info("Today is a weekend or holiday. Skipping the execution of the code.")
+#     sys.exit()
 
 universe_df = pd.read_csv('data/universe.csv')
 universe_df['Disabled'] = universe_df['Disabled'].astype('str')

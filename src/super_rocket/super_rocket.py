@@ -46,9 +46,10 @@ class SuperRocket:
             for stock in self.screened_stocks:
                 symbol = stock['symbol']
                 flag = int(stock['flag'])
-                percent_return = float(stock['percent_return'])
+                # percent_return = float(stock['percent_return'])
                 token = str(symbol_token_mapping.get(symbol))
-                resp = self.obj.scriptinfo("NSE", token)
+                # resp = self.obj.scriptinfo("NSE", token)
+                resp = self.obj.get_quotes("NSE",token)
                 logging.info(resp)
                 ltp = float(resp['o'])
                 previous_day_high = stock['prev_high']

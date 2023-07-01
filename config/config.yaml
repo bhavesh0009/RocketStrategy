@@ -11,3 +11,5 @@ target3: 0.01
 capital: 1000
 buffer_entry: 0.001
 buffer_trigger: 0.05
+target1_quantity_pct: 0.7
+target2_rem_quantity_pct: 0.5

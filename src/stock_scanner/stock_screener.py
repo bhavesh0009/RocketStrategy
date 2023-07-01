@@ -6,6 +6,9 @@ import pandas as pd
 from tqdm import tqdm
 import os
 from utils.utils import Utils
+import json
+import urllib.parse
+
 # import yfinance as yf
 
 
@@ -41,8 +44,10 @@ class StockScreener:
         universe_df = pd.read_csv("data/universe.csv")
         symbol_to_token = {}
         for symbol in universe_df["Symbol"]:
-            token = self.obj.instrument_symbol("NSE", symbol + "-EQ")
-            symbol_to_token[symbol] = token        
+            # token = self.obj.instrument_symbol("NSE", symbol + "-EQ")
+            resp = self.obj.searchscrip(exchange='NSE', searchtext=symbol + "-EQ")
+            token = resp['values'][0]['token']
+            symbol_to_token[symbol] = token  
 
         # Store the symbol-to-token mapping in a file
         mapping_file = "data/symbol_token_mapping.csv"
@@ -57,7 +62,7 @@ class StockScreener:
 
     def get_next_trading_day(self):
         current_time = datetime.now().time()
-        if current_time.hour < 15 or (current_time.hour == 15 and current_time.minute < 35):
+        if current_time.hour < 15 or (current_time.hour == 15 and current_time.minute < 31):
             return date.today().strftime('%Y_%m_%d')
         today = date.today()
         tomorrow = today + timedelta(days=1)
@@ -82,26 +87,27 @@ class StockScreener:
             logging.info("Getting stock data...")
             for symbol in  tqdm(self.stock_symbols, desc="Processing", unit="symbol"):
                 stock_data = self.fetch_stock_data(symbol)
-                # if stock_data.shape[0] == 0:
-                #     logging.warning(f"No data found for {symbol}.")
-                percent_return = self.calculate_percent_return(stock_data)
-                flag = self.check_flag(percent_return)
-                prev_close = stock_data['Close'].iloc[-1]
-                prev_high = stock_data['High'].iloc[-1]
-                prev_low = stock_data['Low'].iloc[-1]
-                pivot_points = self.calculate_pivot_points(stock_data)
+                if stock_data.shape[0] == 0:
+                    logging.warning(f"No data found for {symbol}.")
+                else:
+                    percent_return = self.calculate_percent_return(stock_data)
+                    flag = self.check_flag(percent_return)
+                    prev_close = stock_data['Close'].iloc[-1]
+                    prev_high = stock_data['High'].iloc[-1]
+                    prev_low = stock_data['Low'].iloc[-1]
+                    pivot_points = self.calculate_pivot_points(stock_data)
 
-                stock_dict = {
-                    'symbol': symbol,
-                    'flag': flag,
-                    'percent_return': percent_return,
-                    'prev_high': prev_high,
-                    'prev_low' : prev_low,
-                    'prev_close' : prev_close,
-                    **pivot_points
-                }
-                self.short_listed_stocks.append(stock_dict)
-                time.sleep(0.01)
+                    stock_dict = {
+                        'symbol': symbol,
+                        'flag': flag,
+                        'percent_return': percent_return,
+                        'prev_high': prev_high,
+                        'prev_low' : prev_low,
+                        'prev_close' : prev_close,
+                        **pivot_points
+                    }
+                    self.short_listed_stocks.append(stock_dict)
+                    time.sleep(0.01)
             self.process_shortlisted_stocks(self.short_listed_stocks)
             logging.info("Scan completed.")
         else:
@@ -121,11 +127,13 @@ class StockScreener:
         if total_scans == df[df.flag==0].shape[0]:
             logging.info(f"Scanned {total_scans} stocks but found 0 stock after scanning.")
         next_trading_day = self.get_next_trading_day()
+        df.to_csv(os.path.join("data", f"universe_stocks_{next_trading_day}.csv"), index=False)
         df[~(df.flag==0)].to_csv(os.path.join("data", f"screened_stocks_{next_trading_day}.csv"), index=False)
 
     def fetch_stock_data(self, symbol):
         logging.debug("Running fuction fetch_stock_data.")
         symbol_eq = symbol #+ "-EQ"  # Add "-EQ" to the symbol
+        encoded_symbol = urllib.parse.quote(symbol_eq + "-EQ")
         token = self.symbol_token_mapping.loc[self.symbol_token_mapping["symbol"] == symbol_eq, "token"].values[0]
         current_time = datetime.now().time()
         end_date = date.today()
@@ -134,53 +142,61 @@ class StockScreener:
         end_datetime = datetime.combine(end_date, dt_time.max)
         if current_time < dt_time(15, 31):
             end_datetime -= timedelta(days=1)  # Yesterday's date
-        elif current_time >= dt_time(16, 0):
+        elif current_time >= dt_time(15, 31):
             end_datetime = datetime.combine(end_date, dt_time.max)  # Today's date        
         exchange = "NSE"
         start_datetime = self.getEpoch(start_datetime)
         end_datetime = self.getEpoch(end_datetime)
         # quote_history = self.obj.historical(exchange, str(token),start_datetime ,end_datetime)
-        quote_history = self.get_history(exchange, str(token), start_datetime , end_datetime)
+        quote_history = self.get_history(exchange, str(token), encoded_symbol, start_datetime , end_datetime)
         logging.debug(f"Total records recieved : {len(quote_history)}")
         stock_data = self.process_history_data(quote_history)
         return stock_data
 
-    def get_history(self, exchange, token, start_datetime, end_datetime):
+    def get_history(self, exchange, token, symbol, start_datetime, end_datetime):
         logging.debug("Running fuction get_history.")
         max_retries = 3
         retry_delay = 5
         for retry in range(max_retries):
             try:
-                quote_history = self.obj.historical(exchange, token, start_datetime, end_datetime)
-                logging.debug(f"Total records recieved : {len(quote_history)}")
+                # logging.info(symbol)
+                try:
+                    quote_history = self.obj.get_daily_price_series(exchange, symbol, start_datetime, end_datetime)
+                except Exception as e:             
+                    logging.warning(f"Error occurred while fetching data for {symbol}: {str(e)}")    
+                    quote_history = []       
+                # daily_prices = api.get_daily_price_series("NSE","SBIN-EQ","1687458600","1688063399")
+                # logging.debug(f"Total records recieved : {len(quote_history)}")
                 if len(quote_history) == 0:
-                    logging.warning(f"No data found for {token}")
+                    logging.warning(f"No data found for {symbol}")
                     time.sleep(retry_delay)
                 else:
                     break  
             except Exception as e:
-                logging.warning(f"Error occurred while fetching data for {token}: {str(e)}")
+                logging.warning(f"Error occurred while fetching data for {symbol}: {str(e)}")
                 time.sleep(retry_delay)
         return quote_history
 
     def process_history_data(self, quote_history):
+        quote_history = [json.loads(json_str) for json_str in quote_history]
         logging.debug("Running fuction process_history_data.")
         logging.debug(f"Total records recieved : {len(quote_history)}")
-        columns=['time', 'into', 'inth', 'intl', 'intc', 'intv']
+        columns=['time', 'into', 'inth', 'intl', 'intc','ssboe', 'intv']
         df = pd.DataFrame(quote_history, columns=columns)
         logging.debug(f"Shape of dataframe is {df.shape}")
-        df['time'] = pd.to_datetime(df['time'], format='%d-%m-%Y %H:%M:%S')
+        df = df.drop(['ssboe'], axis=1)
+        df['time'] = pd.to_datetime(df['time'])
         df = df.rename(columns={'time': 'Date', 'into': 'Open', 'inth': 'High', 'intl': 'Low', 'intc': 'Close', 'intv': 'Volume'})
-        unique_dates = df['Date'].dt.date.unique()
-        df = df.set_index('Date')
+        # unique_dates = df['Date'].dt.date.unique()
+        # df = df.set_index('Date')
         for c in ['Open','High','Low','Close']:
             df[c] = df[c].astype('float')
-        df['Volume'] = df['Volume'].astype('int')    
-        df_daily = df.resample('D').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'})
-        df_daily = df_daily.reset_index()
-        df_daily['Date'] = pd.to_datetime(df_daily['Date'])
-        df_daily = df_daily[df_daily['Date'].dt.date.isin(unique_dates)]
-        return df_daily
+        # df['Volume'] = df['Volume'].astype('int')    
+        # df_daily = df.resample('D').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'})
+        # df_daily = df_daily.reset_index()
+        # df_daily['Date'] = pd.to_datetime(df_daily['Date'])
+        # df_daily = df_daily[df_daily['Date'].dt.date.isin(unique_dates)]
+        return df
          
 
     def calculate_percent_return(self, stock_data):
