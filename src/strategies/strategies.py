@@ -14,7 +14,7 @@ class RocketStrategy:
     def __init__(self):
         self.config = Utils.get_config()
         self.obj = Controller.brokerLogin
-        self.obj = Controller.norenLogin
+        # self.obj = Controller.norenLogin
 
     def run_strategy(self):
         self.read_rocket_stocks()
