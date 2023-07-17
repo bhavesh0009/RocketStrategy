@@ -14,7 +14,7 @@ class RocketStrategy:
     def __init__(self):
         self.config = Utils.get_config()
         self.obj = Controller.brokerLogin
-        self.norenObj = Controller.norenLogin
+        self.obj = Controller.norenLogin
 
     def run_strategy(self):
         self.read_rocket_stocks()
@@ -32,7 +32,7 @@ class RocketStrategy:
         # ltp = float(resp['lp'])
         resp = self.obj.get_quotes("NSE",str(token))
         ltp = float(resp['lp'])
-        total_quantity = floor(capital_per_stock / ltp, 0)
+        total_quantity = floor(capital_per_stock / ltp)
         # hardcoding quantity as 1 for testing purpose.
         # quantity = 1
         self.read_screened_shares()
@@ -56,7 +56,7 @@ class RocketStrategy:
             target1_price = order_price * (1 + target1)
             target2_price = order_price * (1 + target2)
             target3_price = order_price * (1 + target3)
-            opposite_trans_type = self.norenObj.TRANSACTION_TYPE_SELL
+            opposite_trans_type = self.obj.TRANSACTION_TYPE_SELL
             logging.info(f"Placing buy order for {symbol} {total_quantity} quantity with trigger price {trigger_price} and order price {order_price}.")
             # entry_order_id = self.obj.order_place(side="B", product="I",
             #       exchange="NSE", symbol=symbol, 
@@ -67,11 +67,13 @@ class RocketStrategy:
             #       )
             entry_order_id = self.obj.place_order(buy_or_sell="B", product_type="I",
                 exchange="NSE", tradingsymbol=symbol + "-EQ", 
+                discloseqty=total_quantity,
                 quantity=total_quantity, price_type="SL-LMT",
                 retention='DAY', 
                 price=order_price, 
                 trigger_price=trigger_price
                 )            
+            entry_order_id = entry_order_id['norenordno']
             logging.info(f"Buy order placed. Order id is {entry_order_id}")
         elif  signal == 'sell':
             entry_price = df[df.symbol == symbol]['prev_high'].values[0]
@@ -82,7 +84,7 @@ class RocketStrategy:
             target1_price = order_price * (1 - target1)
             target2_price = order_price * (1 - target2)
             target3_price = order_price * (1 - target3)
-            opposite_trans_type = self.norenObj.TRANSACTION_TYPE_BUY
+            opposite_trans_type = self.obj.TRANSACTION_TYPE_BUY
             logging.info(f"placing sell order with trigger price {trigger_price} and order price {order_price}.")
             # entry_order_id = self.obj.order_place(side="S", product="I",
             #       exchange="NSE", symbol=symbol, 
@@ -92,74 +94,78 @@ class RocketStrategy:
             #       )
             entry_order_id = self.obj.place_order(buy_or_sell="S", product_type="I",
                 exchange="NSE", tradingsymbol=symbol + "-EQ", 
+                discloseqty=total_quantity,
                 quantity=total_quantity, price_type="SL-LMT",
                 retention='DAY', 
                 price=order_price, 
                 trigger_price=trigger_price
                 )                 
+            entry_order_id = entry_order_id['norenordno']
             logging.info(f"Sell order placed. Order id is {entry_order_id}")
-
-        while True:
-            orders = pd.DataFrame(self.obj.orders)
-            entry_order_status = orders[orders.order_id==entry_order_id]['status'].values[0]
+        exit_flag = False
+        while not exit_flag:
+            orders = pd.DataFrame(self.obj.get_order_book())
+            entry_order_status = orders[orders.norenordno==entry_order_id]['status'].values[0]
+            logging.info(f"Entry order status is {entry_order_status}.")
             if entry_order_status == "REJECTED":
-                rejection_reason = orders[orders.order_id==entry_order_id]['rejreason']
+                rejection_reason = orders[orders.norenordno==entry_order_id]['rejreason']
                 logging.info(f"Order rejected with reason : {rejection_reason}. Exiting the code")
-                sys.exit()
-            elif entry_order_status == "EXECUTED":
-                oco_order_id1 = self.norenObj.place_gtt_oco_mkt_order(
+                exit_flag = True
+            elif entry_order_status == "COMPLETE":
+                oco_order_id1 = self.obj.place_gtt_oco_mkt_order(
                         symbol + "EQ",
                         "NSE",
                         target1_price,
                         stop_loss_price,
                         opposite_trans_type,
-                        self.norenObj.PRODUCT_TYPE_INTRADAY,
+                        self.obj.PRODUCT_TYPE_INTRADAY,
                         target1_quantity,
                     )         
-                oco_order_id2 = self.norenObj.place_gtt_oco_mkt_order(
+                oco_order_id1 = oco_order_id1['norenordno']
+                oco_order_id2 = self.obj.place_gtt_oco_mkt_order(
                         symbol + "EQ",
                         "NSE",
                         target2_price,
                         stop_loss_price,
                         opposite_trans_type,
-                        self.norenObj.PRODUCT_TYPE_INTRADAY,
+                        self.obj.PRODUCT_TYPE_INTRADAY,
                         target2_quantity,
                     )         
-                oco_order_id3 = self.norenObj.place_gtt_oco_mkt_order(
+                oco_order_id2 = oco_order_id2['norenordno']
+                oco_order_id3 = self.obj.place_gtt_oco_mkt_order(
                         symbol + "EQ",
                         "NSE",
                         target3_price,
                         stop_loss_price,
                         opposite_trans_type,
-                        self.norenObj.PRODUCT_TYPE_INTRADAY,
+                        self.obj.PRODUCT_TYPE_INTRADAY,
                         target3_quantity,
                     )         
+                oco_order_id3 = oco_order_id3['norenordno']
                 break
             else:
                 time.sleep(5)
         # Keep checking order status for target 2 order, if executed than trail stop-loss of oco_order_id3
-        while True:
+        while not exit_flag:
             logging.info("Checking for target2 hit.")
-            orders = pd.DataFrame(self.obj.orders)
+            orders = pd.DataFrame(self.obj.get_order_book())
             target2_order_status = orders[orders.order_id==oco_order_id2]['status'].values[0]
             if target2_order_status == "REJECTED":
                 rejection_reason = orders[orders.order_id==oco_order_id2]['rejreason']
                 logging.info(f"Order rejected with reason : {rejection_reason}. Exiting the code")
-            elif entry_order_status == "EXECUTED":
-                alert_id = self.norenObj.modify_gtt_oco_mkt_order(
+            elif entry_order_status == "COMPLETE":
+                alert_id = self.obj.modify_gtt_oco_mkt_order(
                             symbol + "EQ",
                             "NSE",
                             oco_order_id3,
                             target3_price,
                             order_price,
                             opposite_trans_type,
-                            self.norenObj.PRODUCT_TYPE_INTRADAY,
+                            self.obj.PRODUCT_TYPE_INTRADAY,
                             target3_quantity
                         )
             else:
                 time.sleep(5)
-
-
 
     def read_rocket_stocks(self):
         today_date = pd.Timestamp.now().strftime('%Y%m%d')

@@ -37,6 +37,34 @@ class SuperRocket:
         df = pd.read_csv(filename)
         self.screened_stocks = df.to_dict('records')
 
+    def read_quote(self, exchange, token):
+        max_retries = 3
+        retry_delay = 5
+        for retry in range(max_retries):
+            try:
+                resp = self.obj.get_quotes(exchange,token)
+                if not resp['stat'] == "Ok":
+                    logging.warning(f"No data found for {token}")
+                    time.sleep(retry_delay)
+                else:
+                    if not "o" in resp.keys():
+                        logging.warning(f"Open data not found for {token}..Retrying")    
+                        time.sleep(retry_delay)
+                    elif not "lp"  in resp.keys():
+                        logging.warning(f"LTP data not found for {token}..Retrying")    
+                        time.sleep(retry_delay)
+                    elif not "l" in resp.keys():
+                        logging.warning(f"Low data not found for {token}..Retrying")    
+                        time.sleep(retry_delay)
+                    elif not "h" in resp.keys():
+                        logging.warning(f"High data not found for {token}..Retrying")    
+                        time.sleep(retry_delay)
+                    else:
+                        return resp
+            except Exception as e:
+                logging.warning(f"Error occurred while fetching data for {token}: {str(e)}")
+                time.sleep(retry_delay)
+
     def process_stocks(self):
         symbol_token_mapping = pd.read_csv('data/symbol_token_mapping.csv').set_index('symbol')['token'].to_dict()
         # Check if the current time is after 9:14:00 am

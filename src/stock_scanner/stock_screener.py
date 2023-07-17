@@ -145,12 +145,15 @@ class StockScreener:
         elif current_time >= dt_time(15, 31):
             end_datetime = datetime.combine(end_date, dt_time.max)  # Today's date        
         exchange = "NSE"
+        # logging.info(f"getting data between {start_datetime} and {end_datetime}.")
         start_datetime = self.getEpoch(start_datetime)
         end_datetime = self.getEpoch(end_datetime)
         # quote_history = self.obj.historical(exchange, str(token),start_datetime ,end_datetime)
         quote_history = self.get_history(exchange, str(token), encoded_symbol, start_datetime , end_datetime)
         logging.debug(f"Total records recieved : {len(quote_history)}")
         stock_data = self.process_history_data(quote_history)
+        # logging.info(stock_data['Date'].max())
+        # logging.info(stock_data)
         return stock_data
 
     def get_history(self, exchange, token, symbol, start_datetime, end_datetime):
@@ -161,6 +164,7 @@ class StockScreener:
             try:
                 # logging.info(symbol)
                 try:
+                    # logging.info(f"self.obj.get_daily_price_series({exchange}, {symbol}, {start_datetime}, {end_datetime})")
                     quote_history = self.obj.get_daily_price_series(exchange, symbol, start_datetime, end_datetime)
                 except Exception as e:             
                     logging.warning(f"Error occurred while fetching data for {symbol}: {str(e)}")    
@@ -185,17 +189,11 @@ class StockScreener:
         df = pd.DataFrame(quote_history, columns=columns)
         logging.debug(f"Shape of dataframe is {df.shape}")
         df = df.drop(['ssboe'], axis=1)
-        df['time'] = pd.to_datetime(df['time'])
+        df['time'] = pd.to_datetime(df['time'], format='%d-%b-%Y')
+        df = df.sort_values(by='time')
         df = df.rename(columns={'time': 'Date', 'into': 'Open', 'inth': 'High', 'intl': 'Low', 'intc': 'Close', 'intv': 'Volume'})
-        # unique_dates = df['Date'].dt.date.unique()
-        # df = df.set_index('Date')
         for c in ['Open','High','Low','Close']:
             df[c] = df[c].astype('float')
-        # df['Volume'] = df['Volume'].astype('int')    
-        # df_daily = df.resample('D').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'})
-        # df_daily = df_daily.reset_index()
-        # df_daily['Date'] = pd.to_datetime(df_daily['Date'])
-        # df_daily = df_daily[df_daily['Date'].dt.date.isin(unique_dates)]
         return df
          
 

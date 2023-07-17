@@ -46,7 +46,7 @@ class Controller:
         )
         if ret is not None:
             logging.info("Noren object created successfully!!")
-            Controller.norenLogin = api
+            # Controller.norenLogin = api
             Controller.brokerLogin = api
 
     def getBrokerLogin(self):
