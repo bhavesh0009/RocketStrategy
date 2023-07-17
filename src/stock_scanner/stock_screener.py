@@ -1,10 +1,10 @@
 import yfinance as yf
-import pandas as pd
 from datetime import date, timedelta, datetime, time
-import time
+import time as tm
 import logging
 import pytz
 import yaml
+
 
 class StockScreener:
     def __init__(self, stock_symbols, threshold_positive, threshold_negative):
@@ -17,13 +17,15 @@ class StockScreener:
     def sleep_until_time(target_time):
         target_time = datetime.strptime(target_time, '%H:%M:%S').time()
         current_time = datetime.now(pytz.timezone('Asia/Kolkata')).time()
-        time_diff = datetime.combine(date.today(), target_time) - datetime.combine(date.today(), current_time)
+        time_diff = datetime.combine(
+            date.today(), target_time) - datetime.combine(date.today(), current_time)
         sleep_duration = time_diff.total_seconds()
 
         logging.info(f"Sleeping for {sleep_duration} seconds.")
         if sleep_duration > 0:
-            time.sleep(sleep_duration)
-        logging.info("Target time reached. Continue with the rest of the code.")
+            tm.sleep(sleep_duration)
+        logging.info(
+            "Target time reached. Continue with the rest of the code.")
 
     def run_scan(self):
         logging.info("Running scan...")
@@ -43,7 +45,7 @@ class StockScreener:
                 **pivot_points
             }
             self.short_listed_stocks.append(stock_dict)
-            time.sleep(0.5)
+            tm.sleep(0.5)
         logging.info("Scan completed.")
 
     def run_current_day_scan(self):
@@ -63,7 +65,8 @@ class StockScreener:
 
     def calculate_percent_return(self, stock_data):
         stock_data['Prev Close'] = stock_data['Close'].shift(1)
-        stock_data['% Return'] = (stock_data['Close'] - stock_data['Prev Close']) / stock_data['Prev Close'] * 100
+        stock_data['% Return'] = (
+            stock_data['Close'] - stock_data['Prev Close']) / stock_data['Prev Close'] * 100
         return stock_data['% Return'].iloc[-1]
 
     def check_flag(self, percent_return):
